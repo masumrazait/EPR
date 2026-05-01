@@ -12,8 +12,7 @@ const AppState = {
         adminEmail: 'admin@mrtech.com',
         timeZone: 'UTC',
         language: 'en'
-    },
-    performanceReviews: JSON.parse(localStorage.getItem('performanceReviews')) || []
+    }
 };
 
 // ====== AUTO-GENERATION FUNCTIONS ======
@@ -135,7 +134,6 @@ function navigateToPage(page) {
     } else if (page === 'employees') {
         updateEmployeeTable();
         updateEmployeeSelects();
-        updatePerformanceSelects();
     } else if (page === 'time-tracking') {
         updateTimeTable();
         updateTimeEmployeeSelect();
@@ -149,8 +147,6 @@ function navigateToPage(page) {
         updateTeamGrid();
     } else if (page === 'reports') {
         updateReportsPage();
-    } else if (page === 'performance') {
-        updatePerformancePage();
     }
 }
 
@@ -192,15 +188,6 @@ function initializeForms() {
     // Profile Form
     const profileForm = document.getElementById('profileForm');
     profileForm.addEventListener('submit', handleProfileSubmit);
-    
-    // Performance Review Form
-    const performanceReviewForm = document.getElementById('performanceReviewForm');
-    if (performanceReviewForm) {
-        performanceReviewForm.addEventListener('submit', handlePerformanceReviewSubmit);
-    }
-    
-    // Rating stars
-    initializeRatingStars();
     
     // Search and filter inputs
     initializeSearchFilters();
@@ -248,7 +235,6 @@ function handleEmployeeSubmit(e) {
     updateEmployeeTable();
     updateEmployeeSelects();
     updateDashboard();
-    updatePerformanceSelects();
 }
 
 function handleTimeTrackingSubmit(e) {
@@ -970,7 +956,6 @@ function saveData() {
     localStorage.setItem('tasks', JSON.stringify(AppState.tasks));
     localStorage.setItem('contacts', JSON.stringify(AppState.contacts));
     localStorage.setItem('settings', JSON.stringify(AppState.settings));
-    localStorage.setItem('performanceReviews', JSON.stringify(AppState.performanceReviews));
 }
 
 function loadInitialData() {
@@ -990,7 +975,6 @@ function loadInitialData() {
     
     // Initialize all selects
     updateEmployeeSelects();
-    updatePerformanceSelects();
 }
 
 function loadDataFromStorage() {
@@ -1006,7 +990,6 @@ function loadDataFromStorage() {
         timeZone: 'UTC',
         language: 'en'
     };
-    AppState.performanceReviews = JSON.parse(localStorage.getItem('performanceReviews')) || [];
 }
 
 function loadSampleData() {
@@ -1107,10 +1090,6 @@ function exportReport() {
         case 'attendance':
             data = AppState.timeRecords;
             filename = 'attendance-report.csv';
-            break;
-        case 'performance':
-            data = AppState.performanceReviews;
-            filename = 'performance-reviews.csv';
             break;
         case 'productivity':
             data = AppState.tasks.map(task => ({
@@ -1564,108 +1543,5 @@ function showModal(message, onConfirm) {
     });
 }
 
-// ====== PERFORMANCE REVIEW FUNCTIONS ======
-function handlePerformanceReviewSubmit(e) {
-    e.preventDefault();
-    
-    const employeeId = document.getElementById('reviewEmployee').value;
-    const employee = AppState.employees.find(emp => emp.id === employeeId);
-    const reviewerId = document.getElementById('reviewer').value;
-    const reviewer = AppState.employees.find(emp => emp.id === reviewerId);
-    const period = document.getElementById('reviewPeriod').value;
-    const strengths = document.getElementById('reviewStrengths').value;
-    const improvements = document.getElementById('reviewImprovements').value;
-    const goals = document.getElementById('reviewGoals').value;
-    
-    if (!employee || !reviewer || !period || !strengths || !improvements || !goals) {
-        showToast('error', 'Validation Error', 'Please fill in all required fields');
-        return;
-    }
-    
-    // Get ratings
-    const ratings = {};
-    document.querySelectorAll('.rating-stars').forEach(ratingGroup => {
-        const category = ratingGroup.dataset.category;
-        const activeStars = ratingGroup.querySelectorAll('.active').length;
-        ratings[category] = activeStars;
-    });
-    
-    const review = {
-        id: Date.now().toString(),
-        employeeId: employeeId,
-        employeeName: `${employee.firstName} ${employee.lastName}`,
-        reviewerId: reviewerId,
-        reviewerName: `${reviewer.firstName} ${reviewer.lastName}`,
-        period: period,
-        ratings: ratings,
-        strengths: strengths,
-        improvements: improvements,
-        goals: goals,
-        overallScore: Object.values(ratings).reduce((sum, rating) => sum + rating, 0) / Object.keys(ratings).length,
-        status: 'Submitted',
-        createdAt: new Date().toISOString()
-    };
-    
-    AppState.performanceReviews.push(review);
-    saveData();
-    
-    showToast('success', 'Review Submitted', `Performance review for ${review.employeeName} has been submitted.`);
-    
-    // Reset form
-    e.target.reset();
-    resetRatingStars();
-    
-    updatePerformancePage();
-    updateReviewsList();
-}
-
-function initializeRatingStars() {
-    document.querySelectorAll('.rating-stars').forEach(ratingGroup => {
-        const stars = ratingGroup.querySelectorAll('i');
-        
-        stars.forEach((star, index) => {
-            star.addEventListener('click', () => {
-                const rating = parseInt(star.dataset.rating);
-                setRating(ratingGroup, rating);
-            });
-            
-            star.addEventListener('mouseenter', () => {
-                const rating = parseInt(star.dataset.rating);
-                highlightStars(ratingGroup, rating);
-            });
-        });
-        
-        ratingGroup.addEventListener('mouseleave', () => {
-            const activeCount = ratingGroup.querySelectorAll('.active').length;
-            highlightStars(ratingGroup, activeCount);
-        });
-    });
-}
-
-function setRating(ratingGroup, rating) {
-    const stars = ratingGroup.querySelectorAll('i');
-    stars.forEach((star, index) => {
-        if (index < rating) {
-            star.classList.add('active');
-        } else {
-            star.classList.remove('active');
-        }
-    });
-}
-
-function highlightStars(ratingGroup, rating) {
-    const stars = ratingGroup.querySelectorAll('i');
-    stars.forEach((star, index) => {
-        if (index < rating) {
-            star.style.color = 'var(--warning-500)';
-        } else {
-            star.style.color = 'var(--secondary-300)';
-        }
-    });
-}
-
-function resetRatingStars() {
-    document.querySelectorAll('.rating-stars').forEach(ratingGroup => {
-        setRating(ratingGroup, 0);
-    });
-}
+// ====== UTILITY FUNCTIONS ======
+// Additional utility functions can be added here
