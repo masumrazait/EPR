@@ -1108,6 +1108,368 @@ function exportReport() {
     exportToCSV(data, filename);
 }
 
+// ====== REPORTS FUNCTIONS ======
+function updateReportsPage() {
+    // Update all report metrics and charts when navigating to reports page
+    calculateReportMetrics();
+    updateReportsTable();
+    updateReportCharts();
+}
+
+function generateReport() {
+    const dateRange = document.getElementById('reportDateRange').value;
+    const department = document.getElementById('reportDepartment').value;
+    const reportType = document.getElementById('reportType').value;
+    
+    // Calculate metrics based on filters
+    calculateReportMetrics(dateRange, department);
+    
+    // Update the reports table
+    updateReportsTable(department);
+    
+    // Update charts
+    updateReportCharts();
+    
+    showToast('success', 'Report Generated', 'Report has been generated successfully.');
+}
+
+function refreshReports() {
+    calculateReportMetrics();
+    updateReportsTable();
+    updateReportCharts();
+    showToast('success', 'Reports Refreshed', 'All report data has been refreshed.');
+}
+
+function calculateReportMetrics(dateRange = '30', department = '') {
+    // Calculate Total Work Hours
+    let totalHours = 0;
+    let filteredTimeRecords = AppState.timeRecords;
+    
+    if (dateRange !== 'custom') {
+        const days = parseInt(dateRange);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        
+        filteredTimeRecords = AppState.timeRecords.filter(record => {
+            return new Date(record.date) >= cutoffDate;
+        });
+    }
+    
+    // Calculate total hours from time records
+    filteredTimeRecords.forEach(record => {
+        if (record.loginTime && record.logoutTime) {
+            const login = new Date(`2000-01-01T${record.loginTime}`);
+            const logout = new Date(`2000-01-01T${record.logoutTime}`);
+            const hours = (logout - login) / (1000 * 60 * 60);
+            if (hours > 0) totalHours += hours;
+        }
+    });
+    
+    document.getElementById('totalWorkHours').textContent = Math.round(totalHours);
+    
+    // Calculate Average Attendance
+    const totalEmployees = AppState.employees.length;
+    const presentEmployees = filteredTimeRecords.filter(record => record.status === 'Present').length;
+    const avgAttendance = totalEmployees > 0 ? Math.round((presentEmployees / totalEmployees) * 100) : 0;
+    document.getElementById('avgAttendance').textContent = avgAttendance + '%';
+    
+    // Calculate Task Completion Rate
+    let filteredTasks = AppState.tasks;
+    if (department) {
+        filteredTasks = AppState.tasks.filter(task => {
+            const employee = AppState.employees.find(emp => emp.id === task.assigneeId);
+            return employee && employee.department === department;
+        });
+    }
+    
+    const totalTasks = filteredTasks.length;
+    const completedTasks = filteredTasks.filter(task => task.status === 'Completed').length;
+    const completionRate = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    document.getElementById('taskCompletion').textContent = completionRate + '%';
+    
+    // Calculate Leave Utilization
+    let filteredLeaves = AppState.leaveRequests;
+    if (dateRange !== 'custom') {
+        const days = parseInt(dateRange);
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - days);
+        
+        filteredLeaves = AppState.leaveRequests.filter(leave => {
+            return new Date(leave.startDate) >= cutoffDate;
+        });
+    }
+    
+    const approvedLeaves = filteredLeaves.filter(leave => leave.status === 'Approved').length;
+    const totalWorkingDays = totalEmployees * 22; // Approximate working days per month
+    const leaveUtilization = totalWorkingDays > 0 ? Math.round((approvedLeaves / totalWorkingDays) * 100) : 0;
+    document.getElementById('leaveUtilization').textContent = leaveUtilization + '%';
+}
+
+function updateReportsTable(department = '') {
+    const tbody = document.getElementById('reportsTableBody');
+    tbody.innerHTML = '';
+    
+    // Filter employees by department if specified
+    let filteredEmployees = AppState.employees;
+    if (department) {
+        filteredEmployees = AppState.employees.filter(emp => emp.department === department);
+    }
+    
+    if (filteredEmployees.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = '<td colspan="7" style="text-align: center;">No data available</td>';
+        tbody.appendChild(row);
+        return;
+    }
+    
+    filteredEmployees.forEach(employee => {
+        // Calculate work hours for this employee
+        const employeeTimeRecords = AppState.timeRecords.filter(record => record.employeeId === employee.id);
+        let workHours = 0;
+        employeeTimeRecords.forEach(record => {
+            if (record.loginTime && record.logoutTime) {
+                const login = new Date(`2000-01-01T${record.loginTime}`);
+                const logout = new Date(`2000-01-01T${record.logoutTime}`);
+                const hours = (logout - login) / (1000 * 60 * 60);
+                if (hours > 0) workHours += hours;
+            }
+        });
+        
+        // Calculate attendance rate
+        const totalDays = employeeTimeRecords.length;
+        const presentDays = employeeTimeRecords.filter(record => record.status === 'Present').length;
+        const attendanceRate = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
+        
+        // Calculate tasks completed
+        const employeeTasks = AppState.tasks.filter(task => task.assigneeId === employee.id);
+        const tasksCompleted = employeeTasks.filter(task => task.status === 'Completed').length;
+        
+        // Calculate performance score (simplified)
+        const performanceScore = Math.round((attendanceRate * 0.4) + ((tasksCompleted / Math.max(employeeTasks.length, 1)) * 100 * 0.6));
+        
+        // Determine trend
+        const trend = performanceScore >= 80 ? 'up' : performanceScore >= 60 ? 'stable' : 'down';
+        const trendIcon = trend === 'up' ? 'fa-arrow-up' : trend === 'down' ? 'fa-arrow-down' : 'fa-minus';
+        const trendColor = trend === 'up' ? 'positive' : trend === 'down' ? 'negative' : 'neutral';
+        
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>
+                <div class="employee-info">
+                    <div class="employee-avatar">${getInitials(employee.firstName, employee.lastName)}</div>
+                    <div class="employee-details">
+                        <div class="employee-name">${employee.firstName} ${employee.lastName}</div>
+                    </div>
+                </div>
+            </td>
+            <td><span class="badge badge-primary">${employee.department}</span></td>
+            <td>${Math.round(workHours)}</td>
+            <td>${attendanceRate}%</td>
+            <td>${tasksCompleted}</td>
+            <td>${performanceScore}</td>
+            <td><i class="fas ${trendIcon} ${trendColor}"></i></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function updateReportCharts() {
+    // Update attendance trends chart
+    const attendanceCtx = document.getElementById('attendanceChart');
+    if (attendanceCtx) {
+        const weeklyData = getWeeklyAttendanceData();
+        updateAttendanceChart(attendanceCtx, weeklyData);
+    }
+    
+    // Update department performance chart
+    const deptCtx = document.getElementById('deptPerformanceChart');
+    if (deptCtx) {
+        const deptData = getDepartmentPerformanceData();
+        updateDeptPerformanceChart(deptCtx, deptData);
+    }
+    
+    // Update task distribution chart
+    const taskCtx = document.getElementById('taskDistributionChart');
+    if (taskCtx) {
+        const taskData = getTaskDistributionData();
+        updateTaskDistributionChart(taskCtx, taskData);
+    }
+    
+    // Update leave analysis chart
+    const leaveCtx = document.getElementById('leaveAnalysisChart');
+    if (leaveCtx) {
+        const leaveData = getLeaveAnalysisData();
+        updateLeaveAnalysisChart(leaveCtx, leaveData);
+    }
+}
+
+function getWeeklyAttendanceData() {
+    const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const data = days.map(day => {
+        const dayRecords = AppState.timeRecords.filter(record => {
+            const recordDate = new Date(record.date);
+            return recordDate.getDay() === days.indexOf(day) + 1;
+        });
+        return dayRecords.filter(r => r.status === 'Present').length;
+    });
+    return { labels: days, data: data };
+}
+
+function getDepartmentPerformanceData() {
+    const departments = ['Engineering', 'Sales', 'Marketing', 'HR', 'Finance', 'Operations'];
+    const data = departments.map(dept => {
+        const deptEmployees = AppState.employees.filter(emp => emp.department === dept);
+        return deptEmployees.length;
+    });
+    return { labels: departments, data: data };
+}
+
+function getTaskDistributionData() {
+    const statuses = ['Pending', 'In Progress', 'Completed', 'Overdue'];
+    const data = statuses.map(status => {
+        return AppState.tasks.filter(task => task.status === status).length;
+    });
+    return { labels: statuses, data: data };
+}
+
+function getLeaveAnalysisData() {
+    const types = ['Annual', 'Sick', 'Personal', 'Other'];
+    const data = types.map(type => {
+        return AppState.leaveRequests.filter(leave => leave.type === type && leave.status === 'Approved').length;
+    });
+    return { labels: types, data: data };
+}
+
+function updateAttendanceChart(ctx, data) {
+    if (window.attendanceChartInstance) {
+        window.attendanceChartInstance.destroy();
+    }
+    
+    window.attendanceChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Attendance',
+                data: data.data,
+                borderColor: 'var(--primary-500)',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function updateDeptPerformanceChart(ctx, data) {
+    if (window.deptChartInstance) {
+        window.deptChartInstance.destroy();
+    }
+    
+    window.deptChartInstance = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.data,
+                backgroundColor: [
+                    'var(--primary-500)',
+                    'var(--success-500)',
+                    'var(--warning-500)',
+                    'var(--danger-500)',
+                    'var(--secondary-500)',
+                    'var(--accent-500)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 12 }
+                }
+            }
+        }
+    });
+}
+
+function updateTaskDistributionChart(ctx, data) {
+    if (window.taskChartInstance) {
+        window.taskChartInstance.destroy();
+    }
+    
+    window.taskChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                label: 'Tasks',
+                data: data.data,
+                backgroundColor: [
+                    'var(--warning-500)',
+                    'var(--primary-500)',
+                    'var(--success-500)',
+                    'var(--danger-500)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                y: { beginAtZero: true }
+            }
+        }
+    });
+}
+
+function updateLeaveAnalysisChart(ctx, data) {
+    if (window.leaveChartInstance) {
+        window.leaveChartInstance.destroy();
+    }
+    
+    window.leaveChartInstance = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: data.labels,
+            datasets: [{
+                data: data.data,
+                backgroundColor: [
+                    'var(--primary-500)',
+                    'var(--success-500)',
+                    'var(--warning-500)',
+                    'var(--secondary-500)'
+                ]
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 12 }
+                }
+            }
+        }
+    });
+}
+
 function convertToCSV(data) {
     if (data.length === 0) return '';
     
