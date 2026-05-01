@@ -28,8 +28,10 @@ function generateEmpId() {
         const nextId = existingEmployees + 1;
         const empId = `MR-${nextId.toString().padStart(4, '0')}`;
         empIdField.value = empId;
+        return empId; // Return the generated ID
     } else {
         empIdField.value = '';
+        return '';
     }
 }
 
