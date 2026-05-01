@@ -133,6 +133,7 @@ function navigateToPage(page) {
     } else if (page === 'employees') {
         updateEmployeeTable();
         updateEmployeeSelects();
+        updatePerformanceSelects();
     } else if (page === 'time-tracking') {
         updateTimeTable();
         updateTimeEmployeeSelect();
@@ -216,9 +217,11 @@ function handleEmployeeSubmit(e) {
         return;
     }
     
+    const empId = generateEmpId();
+    
     const employee = {
         id: Date.now().toString(),
-        empId: document.getElementById('empId').value,
+        empId: empId,
         firstName: firstName,
         lastName: lastName,
         email: email,
@@ -982,6 +985,10 @@ function loadInitialData() {
     
     // Ensure data persistence on page load
     loadDataFromStorage();
+    
+    // Initialize all selects
+    updateEmployeeSelects();
+    updatePerformanceSelects();
 }
 
 function loadDataFromStorage() {
