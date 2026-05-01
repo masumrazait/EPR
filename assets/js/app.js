@@ -1111,33 +1111,58 @@ function exportReport() {
 // ====== REPORTS FUNCTIONS ======
 function updateReportsPage() {
     // Update all report metrics and charts when navigating to reports page
-    calculateReportMetrics();
-    updateReportsTable();
-    updateReportCharts();
+    try {
+        calculateReportMetrics();
+        updateReportsTable();
+        
+        // Delay chart rendering slightly to ensure DOM is ready
+        setTimeout(() => {
+            updateReportCharts();
+        }, 100);
+    } catch (error) {
+        console.error('Error updating reports page:', error);
+    }
 }
 
 function generateReport() {
-    const dateRange = document.getElementById('reportDateRange').value;
-    const department = document.getElementById('reportDepartment').value;
-    const reportType = document.getElementById('reportType').value;
-    
-    // Calculate metrics based on filters
-    calculateReportMetrics(dateRange, department);
-    
-    // Update the reports table
-    updateReportsTable(department);
-    
-    // Update charts
-    updateReportCharts();
-    
-    showToast('success', 'Report Generated', 'Report has been generated successfully.');
+    try {
+        const dateRange = document.getElementById('reportDateRange').value;
+        const department = document.getElementById('reportDepartment').value;
+        const reportType = document.getElementById('reportType').value;
+        
+        // Calculate metrics based on filters
+        calculateReportMetrics(dateRange, department);
+        
+        // Update the reports table
+        updateReportsTable(department);
+        
+        // Update charts with slight delay
+        setTimeout(() => {
+            updateReportCharts();
+        }, 100);
+        
+        showToast('success', 'Report Generated', 'Report has been generated successfully.');
+    } catch (error) {
+        console.error('Error generating report:', error);
+        showToast('error', 'Report Error', 'Failed to generate report. Please try again.');
+    }
 }
 
 function refreshReports() {
-    calculateReportMetrics();
-    updateReportsTable();
-    updateReportCharts();
-    showToast('success', 'Reports Refreshed', 'All report data has been refreshed.');
+    try {
+        calculateReportMetrics();
+        updateReportsTable();
+        
+        // Update charts with slight delay
+        setTimeout(() => {
+            updateReportCharts();
+        }, 100);
+        
+        showToast('success', 'Reports Refreshed', 'All report data has been refreshed.');
+    } catch (error) {
+        console.error('Error refreshing reports:', error);
+        showToast('error', 'Refresh Error', 'Failed to refresh reports. Please try again.');
+    }
 }
 
 function calculateReportMetrics(dateRange = '30', department = '') {
@@ -1341,133 +1366,171 @@ function getLeaveAnalysisData() {
 }
 
 function updateAttendanceChart(ctx, data) {
-    if (window.attendanceChartInstance) {
-        window.attendanceChartInstance.destroy();
-    }
-    
-    window.attendanceChartInstance = new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: data.labels,
-            datasets: [{
-                label: 'Attendance',
-                data: data.data,
-                borderColor: 'var(--primary-500)',
-                backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                tension: 0.4,
-                fill: true
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                y: { beginAtZero: true }
-            }
+    try {
+        if (window.attendanceChartInstance) {
+            window.attendanceChartInstance.destroy();
         }
-    });
+        
+        // Check if we have valid data
+        const hasData = data.data && data.data.some(val => val > 0);
+        const chartData = hasData ? data.data : [0, 0, 0, 0, 0, 0, 0];
+        
+        window.attendanceChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: data.labels || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                datasets: [{
+                    label: 'Attendance',
+                    data: chartData,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error creating attendance chart:', error);
+    }
 }
 
 function updateDeptPerformanceChart(ctx, data) {
-    if (window.deptChartInstance) {
-        window.deptChartInstance.destroy();
-    }
-    
-    window.deptChartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: data.labels,
-            datasets: [{
-                data: data.data,
-                backgroundColor: [
-                    'var(--primary-500)',
-                    'var(--success-500)',
-                    'var(--warning-500)',
-                    'var(--danger-500)',
-                    'var(--secondary-500)',
-                    'var(--accent-500)'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 12 }
+    try {
+        if (window.deptChartInstance) {
+            window.deptChartInstance.destroy();
+        }
+        
+        // Check if we have valid data
+        const hasData = data.data && data.data.some(val => val > 0);
+        const chartData = hasData ? data.data : [1, 1, 1, 1, 1, 1]; // Default placeholder
+        
+        window.deptChartInstance = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: data.labels || ['Engineering', 'Sales', 'Marketing', 'HR', 'Finance', 'Operations'],
+                datasets: [{
+                    data: chartData,
+                    backgroundColor: [
+                        '#3b82f6',
+                        '#10b981',
+                        '#f59e0b',
+                        '#ef4444',
+                        '#6b7280',
+                        '#8b5cf6'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 11 } }
+                    }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error creating department chart:', error);
+    }
 }
 
 function updateTaskDistributionChart(ctx, data) {
-    if (window.taskChartInstance) {
-        window.taskChartInstance.destroy();
-    }
-    
-    window.taskChartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: data.labels,
-            datasets: [{
-                label: 'Tasks',
-                data: data.data,
-                backgroundColor: [
-                    'var(--warning-500)',
-                    'var(--primary-500)',
-                    'var(--success-500)',
-                    'var(--danger-500)'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                y: { beginAtZero: true }
-            }
+    try {
+        if (window.taskChartInstance) {
+            window.taskChartInstance.destroy();
         }
-    });
+        
+        // Check if we have valid data
+        const hasData = data.data && data.data.some(val => val > 0);
+        const chartData = hasData ? data.data : [0, 0, 0, 0];
+        
+        window.taskChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: data.labels || ['Pending', 'In Progress', 'Completed', 'Overdue'],
+                datasets: [{
+                    label: 'Tasks',
+                    data: chartData,
+                    backgroundColor: [
+                        '#f59e0b',
+                        '#3b82f6',
+                        '#10b981',
+                        '#ef4444'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { 
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    } catch (error) {
+        console.error('Error creating task chart:', error);
+    }
 }
 
 function updateLeaveAnalysisChart(ctx, data) {
-    if (window.leaveChartInstance) {
-        window.leaveChartInstance.destroy();
-    }
-    
-    window.leaveChartInstance = new Chart(ctx, {
-        type: 'pie',
-        data: {
-            labels: data.labels,
-            datasets: [{
-                data: data.data,
-                backgroundColor: [
-                    'var(--primary-500)',
-                    'var(--success-500)',
-                    'var(--warning-500)',
-                    'var(--secondary-500)'
-                ]
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'bottom',
-                    labels: { boxWidth: 12 }
+    try {
+        if (window.leaveChartInstance) {
+            window.leaveChartInstance.destroy();
+        }
+        
+        // Check if we have valid data
+        const hasData = data.data && data.data.some(val => val > 0);
+        const chartData = hasData ? data.data : [1, 1, 1, 1]; // Default placeholder
+        
+        window.leaveChartInstance = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: data.labels || ['Annual', 'Sick', 'Personal', 'Other'],
+                datasets: [{
+                    data: chartData,
+                    backgroundColor: [
+                        '#3b82f6',
+                        '#10b981',
+                        '#f59e0b',
+                        '#6b7280'
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { boxWidth: 12, font: { size: 11 } }
+                    }
                 }
             }
-        }
-    });
+        });
+    } catch (error) {
+        console.error('Error creating leave chart:', error);
+    }
 }
 
 function convertToCSV(data) {
